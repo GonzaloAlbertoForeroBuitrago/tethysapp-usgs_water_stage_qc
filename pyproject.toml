@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tethysapp-usgs_water_stage_qc"
+description =  "Tethys application for real-time flood early warning, MRMS rainfall visualization, USGS water stage monitoring, and hydrologic alert analysis across the United States."
+
+readme = "README.md"
+
+license = { text = "Apache-2.0" }
+
+authors = [
+    { name = "Gonzalo Forero" },
+    { name = "Jacob Jhonson" }
+]
+
+keywords = ["flood",
+    "flood forecasting",
+    "early warning system",
+    "hydrology",
+    "MRMS",
+    "USGS",
+    "rainfall",
+    "water stage",
+    "hydrologic modeling",
+    "geospatial",
+    "Tethys Platform",
+    "flash floods",
+    "radar rainfall",
+    "hydroinformatics",
+    "real-time monitoring"]
+
+classifiers = [
+     "Environment :: Web Environment",
+     "Framework :: Django",
+     "Intended Audience :: Developers",
+     "Operating System :: OS Independent",
+     "Programming Language :: Python",
+     "Programming Language :: Python :: 3",
+     "Programming Language :: Python :: 3.10",
+     "Topic :: Internet :: WWW/HTTP",
+     "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+]
+dynamic = ["version"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]
+
+[tool.setuptools.package-data]
+"tethysapp.usgs_water_stage_qc" = [
+    "templates/**/*",
+    "public/**/*",
+    "resources/**/*",
+    "workspaces/**/*"
+]

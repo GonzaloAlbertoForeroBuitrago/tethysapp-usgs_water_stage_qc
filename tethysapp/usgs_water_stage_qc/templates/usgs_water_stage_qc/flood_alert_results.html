@@ -1,0 +1,764 @@
+{% extends "usgs_water_stage_qc/base.html" %}
+
+{% block title %}{{ block.super }} - Flood Alert Results{% endblock %}
+
+{% block styles %}
+{{ block.super }}
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.content,
+#content-container,
+.main-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+#app-content-wrapper {
+  margin-left: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.operational-layout {
+  display: flex;
+  width: 100%;
+  height: calc(100vh - 72px);
+  overflow: hidden;
+  background: #111827;
+}
+
+.left-panel {
+  width: 360px;
+  min-width: 360px;
+  background: #1F2937;
+  color: #F9FAFB;
+  padding: 24px;
+  overflow-y: auto;
+  border-right: 1px solid rgba(255,255,255,0.08);
+}
+
+.operational-header {
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: 1rem;
+}
+
+.left-panel h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.subtitle {
+  color: #9CA3AF;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  font-size: 0.82rem;
+  margin-top: 0.8rem;
+}
+
+.panel-section {
+  margin-top: 1.8rem;
+}
+
+.panel-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #9CA3AF;
+  margin-bottom: 0.8rem;
+  text-transform: uppercase;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.8rem;
+}
+
+.meta-item {
+  background: rgba(255,255,255,0.04);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+}
+
+.meta-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: #9CA3AF;
+  margin-bottom: 0.25rem;
+}
+
+.meta-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.legend-stack,
+.control-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.legend-item,
+.control-item {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-size: 0.96rem;
+}
+
+.legend-color {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.25);
+}
+
+.control-item input[type="checkbox"] {
+  transform: scale(1.15);
+}
+
+#pixel-status {
+  margin-top: 1rem;
+  font-size: 0.92rem;
+  color: #D1D5DB;
+  background: rgba(255,255,255,0.05);
+  padding: 0.9rem;
+  border-radius: 10px;
+}
+
+.map-container {
+  flex: 1;
+  position: relative;
+  background: #0B1220;
+}
+
+#flood-alert-map {
+  width: 100%;
+  height: 100%;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 12px;
+}
+
+.leaflet-popup-content {
+  max-height: 68vh;
+  overflow-y: auto;
+  margin: 14px 16px;
+}
+
+.leaflet-control-zoom a {
+  background-color: #1F2937 !important;
+  color: #FFFFFF !important;
+  border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: #374151 !important;
+}
+
+.alert-popup {
+  min-width: 340px;
+  max-width: 430px;
+}
+
+.popup-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+}
+
+.popup-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.popup-table th,
+.popup-table td {
+  border: 1px solid #D1D5DB;
+  padding: 5px 7px;
+  vertical-align: top;
+}
+
+.popup-table th {
+  width: 42%;
+  background: #F9FAFB;
+  font-weight: 700;
+}
+
+.popup-table td {
+  background: #FFFFFF;
+  word-break: break-word;
+}
+
+.popup-section th {
+  background: #E5E7EB !important;
+  color: #111827;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.popup-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: white;
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.popup-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+}
+</style>
+{% endblock %}
+
+{% block app_content %}
+
+<div class="operational-layout">
+  <div class="left-panel">
+    <div class="operational-header">
+      <h2>Flood Alert</h2>
+      <div class="subtitle">
+        Operational basin-scale flood alert monitoring using MRMS rainfall and USGS stage response.
+      </div>
+      <div class="status-pill">{{ state }}</div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">Run Information</div>
+      <div class="meta-grid">
+        <div class="meta-item">
+          <div class="meta-label">Run ID</div>
+          <div class="meta-value">{{ run_id }}</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Basin GeoJSON</div>
+          <div class="meta-value">{{ basin_geojson_exists }}</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Pixel Parquet</div>
+          <div class="meta-value">{{ pixel_parquet_exists }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">Layer Controls</div>
+      <div class="control-stack">
+        <label class="control-item">
+          <input type="checkbox" id="toggle-flash-rapid" checked>
+          Flash Flood ≤2h
+        </label>
+        <label class="control-item">
+          <input type="checkbox" id="toggle-flash" checked>
+          Flash Flood 2–6h
+        </label>
+        <label class="control-item">
+          <input type="checkbox" id="toggle-basin" checked>
+          Basin Flood &gt;6h
+        </label>
+        <label class="control-item">
+          <input type="checkbox" id="toggle-warning" checked>
+          Warning Basins
+        </label>
+        <label class="control-item">
+          <input type="checkbox" id="toggle-pixels" checked>
+          Pixel Alerts
+        </label>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">Operational Legend</div>
+      <div class="legend-stack">
+        <div class="legend-item">
+          <span class="legend-color" style="background:#b91c1c;"></span>
+          Flash Flood ≤2h
+        </div>
+        <div class="legend-item">
+          <span class="legend-color" style="background:#f97316;"></span>
+          Flash Flood 2–6h
+        </div>
+        <div class="legend-item">
+          <span class="legend-color" style="background:#facc15;"></span>
+          Basin Flood &gt;6h
+        </div>
+        <div class="legend-item">
+          <span class="legend-color" style="background:#7c3aed;"></span>
+          Warning
+        </div>
+        <div class="legend-item">
+          <span class="legend-color" style="background:#38bdf8;"></span>
+          Pixel Alerts
+        </div>
+        <div class="legend-item">
+          <span class="legend-color" style="background:#FFFFFF;border:3px solid #000;border-radius:50%;"></span>
+          Max Pixel
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">Pixel Status</div>
+      <div id="pixel-status">Pixel layer: not loaded.</div>
+    </div>
+  </div>
+
+  <div class="map-container">
+    <div id="flood-alert-map"></div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+window.addEventListener("load", () => {
+  const state = "{{ state|escapejs }}";
+  const runId = "{{ run_id|escapejs }}";
+  const basinUrl = `/apps/usgs-water-stage-qc/flood-alert/geojson/${state}/${runId}/basins/`;
+
+  const map = L.map("flood-alert-map", { preferCanvas: true }).setView([31.0, -99.0], 6);
+
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap contributors",
+  }).addTo(map);
+
+  const flashRapidCheckbox = document.getElementById("toggle-flash-rapid");
+  const flashCheckbox = document.getElementById("toggle-flash");
+  const basinCheckbox = document.getElementById("toggle-basin");
+  const warningCheckbox = document.getElementById("toggle-warning");
+  const pixelsCheckbox = document.getElementById("toggle-pixels");
+  const pixelStatus = document.getElementById("pixel-status");
+
+  let basinLayer = null;
+  let pixelLayer = null;
+  let maxPixelMarker = null;
+  let basinFeatures = [];
+
+  function isValidNumber(value) {
+    const n = Number(value);
+    return Number.isFinite(n);
+  }
+
+  function formatNumber(value, digits = 2) {
+    if (value === null || value === undefined || value === "") return "";
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toFixed(digits) : "";
+  }
+
+  function formatPercent(value, digits = 1) {
+    if (!isValidNumber(value)) return "";
+    return `${Number(value).toFixed(digits)}%`;
+  }
+
+  function formatHour(value, digits = 2) {
+    if (!isValidNumber(value)) return "";
+    return `${Number(value).toFixed(digits)} hr`;
+  }
+
+  function operationalLevel(properties) {
+    return properties?.operational_alert_level || properties?.alert_level || "";
+  }
+
+  function operationalLabel(properties) {
+    return properties?.operational_alert_label || properties?.operational_alert_level || properties?.alert_level || "";
+  }
+
+  function operationalGroup(level) {
+    if (level === "FLASH_FLOOD_1H" || level === "FLASH_FLOOD_2H") return "FLASH_RAPID";
+    if (level === "FLASH_FLOOD_3H" || level === "FLASH_FLOOD_4H" || level === "FLASH_FLOOD_6H") return "FLASH";
+    if (level === "BASIN_FLOOD") return "BASIN";
+    if (level === "WARNING") return "WARNING";
+    if (level === "SEVERE_UNKNOWN_RESPONSE") return "UNKNOWN";
+    return level || "UNKNOWN";
+  }
+
+  function alertColor(level) {
+    const group = operationalGroup(level);
+    if (group === "FLASH_RAPID") return "#b91c1c";
+    if (group === "FLASH") return "#f97316";
+    if (group === "BASIN") return "#facc15";
+    if (group === "WARNING") return "#7c3aed";
+    if (group === "WATCH") return "#fde68a";
+    if (group === "NORMAL") return "#22c55e";
+    return "#9ca3af";
+  }
+
+  function basinSize(feature) {
+    return Number(feature.properties?.n_active_pixels ?? 0);
+  }
+
+  function basinStyle(feature) {
+    const p = feature.properties || {};
+    const level = operationalLevel(p);
+    const group = operationalGroup(level);
+    const color = alertColor(level);
+    const isPriority = group === "FLASH_RAPID";
+    const isFlood = group === "FLASH_RAPID" || group === "FLASH" || group === "BASIN";
+
+    return {
+      color: isPriority ? "#000000" : "#1f2937",
+      weight: isPriority ? 4.8 : (isFlood ? 3.2 : 1.8),
+      fillColor: color,
+      fillOpacity: isPriority ? 0.78 : (isFlood ? 0.66 : 0.45),
+      interactive: true
+    };
+  }
+
+  function basinHoverStyle(feature) {
+    const p = feature.properties || {};
+    const level = operationalLevel(p);
+    const group = operationalGroup(level);
+    const color = alertColor(level);
+    const isPriority = group === "FLASH_RAPID";
+
+    return {
+      color: "#000000",
+      weight: isPriority ? 6.2 : 4.2,
+      fillColor: color,
+      fillOpacity: 0.9,
+    };
+  }
+
+  function pixelStyle(feature) {
+    const p = feature.properties || {};
+    return {
+      color: "#111111",
+      weight: 0.45,
+      fillColor: p.fill_color || "#38bdf8",
+      fillOpacity: 0.82,
+    };
+  }
+
+  function clearMaxPixelMarker() {
+    if (maxPixelMarker) {
+      map.removeLayer(maxPixelMarker);
+      maxPixelMarker = null;
+    }
+  }
+
+  function clearPixelLayer(message = "Pixel layer: not loaded.") {
+    if (pixelLayer) {
+      map.removeLayer(pixelLayer);
+      pixelLayer = null;
+    }
+    clearMaxPixelMarker();
+    pixelStatus.innerHTML = message;
+  }
+
+  function polygonCenterFromFeature(feature) {
+    const geom = feature.geometry || {};
+    let ring = null;
+
+    if (geom.type === "Polygon") {
+      ring = geom.coordinates?.[0];
+    } else if (geom.type === "MultiPolygon") {
+      ring = geom.coordinates?.[0]?.[0];
+    }
+
+    if (!Array.isArray(ring) || ring.length === 0) return null;
+
+    let sumLon = 0;
+    let sumLat = 0;
+    let n = 0;
+
+    ring.forEach(pt => {
+      if (Array.isArray(pt) && pt.length >= 2) {
+        const lon = Number(pt[0]);
+        const lat = Number(pt[1]);
+        if (Number.isFinite(lon) && Number.isFinite(lat)) {
+          sumLon += lon;
+          sumLat += lat;
+          n += 1;
+        }
+      }
+    });
+
+    return n > 0 ? [sumLat / n, sumLon / n] : null;
+  }
+
+  function highlightMaxPixel(pixelFeatures) {
+    clearMaxPixelMarker();
+    if (!pixelFeatures || pixelFeatures.length === 0) return;
+
+    const maxFeature = pixelFeatures.reduce((best, current) => {
+      const bestValue = Number(best.properties?.current_pixel_value ?? -Infinity);
+      const currentValue = Number(current.properties?.current_pixel_value ?? -Infinity);
+      return currentValue > bestValue ? current : best;
+    });
+
+    const center = polygonCenterFromFeature(maxFeature);
+    if (!center) return;
+
+    maxPixelMarker = L.circleMarker(center, {
+      radius: 13,
+      color: "#000000",
+      weight: 3,
+      fillColor: "#FFFFFF",
+      fillOpacity: 0.18,
+      opacity: 1,
+      interactive: false
+    }).addTo(map);
+  }
+
+  function sectionRow(title) {
+    return `<tr class="popup-section"><th colspan="2">${title}</th></tr>`;
+  }
+
+  function infoRow(label, value, suffix = "") {
+    const display = value === null || value === undefined || value === "" ? "" : `${value}${suffix}`;
+    return `<tr><th>${label}</th><td>${display}</td></tr>`;
+  }
+
+  function basinPopup(feature) {
+    const p = feature.properties || {};
+    const siteId = p.site_id ?? "";
+    const level = operationalLevel(p);
+    const label = operationalLabel(p);
+    const color = alertColor(level);
+    const activeFraction = isValidNumber(p.active_pixel_fraction)
+      ? Number(p.active_pixel_fraction) * 100
+      : null;
+
+    return `
+      <div class="alert-popup">
+        <div class="popup-title">Basin Alert</div>
+        <table class="popup-table">
+          ${sectionRow("Alert Classification")}
+          ${infoRow("USGS ID", siteId)}
+          <tr><th>Operational Alert</th><td><span class="popup-badge" style="background:${color};">${label}</span></td></tr>
+          ${infoRow("Base Alert", p.alert_level ?? "")}
+          ${infoRow("Response Time", formatHour(p.operational_response_hr))}
+          ${infoRow("Response Source", p.operational_response_source ?? "")}
+
+          ${sectionRow("Current Conditions")}
+          ${infoRow("Max Pixel Rain", formatNumber(p.current_max_pixel_value), " mm/h")}
+          ${infoRow("Max Pixel Accum.", formatNumber(p.current_max_pixel_accumulation), " mm")}
+          ${infoRow("Basin Rain Accum.", formatNumber(p.current_basin_accumulation), " mm")}
+          ${infoRow("Active Pixels", p.n_active_pixels ?? "")}
+          ${infoRow("Active Fraction", formatPercent(activeFraction))}
+
+          ${sectionRow("Historical Max Stage-Rise Event")}
+          ${infoRow("Event ID", p.historical_max_delta_event_id ?? "")}
+          ${infoRow("Max-Delta Response", formatHour(p.historical_max_delta_response_hr))}
+          ${infoRow("Stage Rise", formatNumber(p.historical_max_delta_water_stage), " ft")}
+          ${infoRow("Basin Rain Accum.", formatNumber(p.historical_max_delta_basin_accumulation), " mm")}
+          ${infoRow("Pixel Rain Accum.", formatNumber(p.historical_max_delta_pixel_accumulation), " mm")}
+
+          ${sectionRow("Peak Time")}
+          ${infoRow("Basin Peak Time", formatHour(p.basin_peak_time))}
+          ${infoRow("Strongest Pixel Peak Time", formatHour(p.pixel_peak_time))}
+          ${infoRow("Max-Delta Basin Peak Time", formatHour(p.max_delta_basin_peak_time))}
+          ${infoRow("Max-Delta Pixel Peak Time", formatHour(p.max_delta_pixel_peak_time))}
+
+        </table>
+
+        <div class="popup-actions">
+          <button class="btn btn-sm btn-primary" onclick="loadPixelsForSite('${siteId}')">
+            Load Pixel Alerts
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  function pixelPopup(feature) {
+    const p = feature.properties || {};
+    return `
+      <div class="alert-popup">
+        <div class="popup-title">Pixel Alert</div>
+        <table class="popup-table">
+          ${sectionRow("Current Pixel")}
+          ${infoRow("USGS ID", p.site_id ?? "")}
+          ${infoRow("Pixel Rain", formatNumber(p.current_pixel_value), " mm/h")}
+          ${infoRow("Pixel Accum.", formatNumber(p.current_pixel_accumulation), " mm")}
+          ${infoRow("Basin Rain Accum.", formatNumber(p.current_basin_accumulation), " mm")}
+
+          ${sectionRow("Historical Pixel Match")}
+          ${infoRow("Best Event ID", p.historical_pixel_best_event_id ?? "")}
+          ${infoRow("Stage Rise", formatNumber(p.historical_pixel_best_delta_water_stage), " ft")}
+          ${infoRow("Basin Rain Accum.", formatNumber(p.historical_pixel_best_basin_accumulation), " mm")}
+          ${infoRow("Pixel Rain Accum.", formatNumber(p.historical_pixel_best_pixel_accumulation), " mm")}
+        </table>
+      </div>
+    `;
+  }
+
+  function visibleBasinFeatures() {
+    return basinFeatures.filter(feature => {
+      const p = feature.properties || {};
+      const level = operationalLevel(p);
+      const group = operationalGroup(level);
+
+      if (group === "FLASH_RAPID" && !flashRapidCheckbox.checked) return false;
+      if (group === "FLASH" && !flashCheckbox.checked) return false;
+      if (group === "BASIN" && !basinCheckbox.checked) return false;
+      if (group === "WARNING" && !warningCheckbox.checked) return false;
+
+      return true;
+    });
+  }
+
+  function rebuildBasinLayer({ fit = false } = {}) {
+    if (basinLayer) {
+      map.removeLayer(basinLayer);
+      basinLayer = null;
+    }
+
+    const visible = visibleBasinFeatures().sort((a, b) => basinSize(b) - basinSize(a));
+
+    basinLayer = L.geoJSON(
+      { type: "FeatureCollection", features: visible },
+      {
+        style: basinStyle,
+        onEachFeature: (feature, layer) => {
+          layer.bindPopup(basinPopup(feature), {
+            minWidth: 360,
+            maxWidth: 460,
+            maxHeight: 520,
+            autoPan: true,
+            keepInView: true,
+            closeButton: true
+          });
+
+          layer.on("mouseover", () => layer.setStyle(basinHoverStyle(feature)));
+          layer.on("mouseout", () => basinLayer && basinLayer.resetStyle(layer));
+        }
+      }
+    ).addTo(map);
+
+    if (fit && basinLayer.getBounds().isValid()) {
+      map.fitBounds(basinLayer.getBounds(), { padding: [20, 20], maxZoom: 8 });
+    }
+  }
+
+  window.loadPixelsForSite = function(siteId) {
+    if (!siteId) {
+      alert("Missing site_id.");
+      return;
+    }
+
+    clearPixelLayer(`Pixel layer: loading site <strong>${siteId}</strong>...`);
+
+    const pixelUrl = `/apps/usgs-water-stage-qc/flood-alert/geojson/${state}/${runId}/pixels/?site_id=${encodeURIComponent(siteId)}&max_pixels=1500`;
+
+    fetch(pixelUrl)
+      .then(response => {
+        if (!response.ok) throw new Error(`Failed loading pixel GeoJSON: ${response.status}`);
+        return response.json();
+      })
+      .then(data => {
+        clearPixelLayer(`Pixel layer: loading site <strong>${siteId}</strong>...`);
+
+        pixelLayer = L.geoJSON(data, {
+          style: pixelStyle,
+          onEachFeature: (feature, layer) => {
+            layer.bindPopup(pixelPopup(feature), {
+              minWidth: 330,
+              maxWidth: 430,
+              maxHeight: 500,
+              autoPan: true,
+              keepInView: true
+            });
+          },
+        });
+
+        if (pixelsCheckbox.checked) {
+          pixelLayer.addTo(map);
+          highlightMaxPixel(data.features || []);
+        }
+
+        const nFeatures = data.metadata?.n_features ?? data.features?.length ?? 0;
+        pixelStatus.innerHTML = `Pixel layer: loaded <strong>${nFeatures}</strong> pixels for site <strong>${siteId}</strong>.`;
+
+        if (pixelLayer.getBounds().isValid()) {
+          map.fitBounds(pixelLayer.getBounds(), { padding: [20, 20], maxZoom: 11 });
+        } else {
+          clearPixelLayer(`Pixel layer: no pixel alerts found for site <strong>${siteId}</strong>.`);
+          alert(`No pixel alerts found for site ${siteId}.`);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        clearPixelLayer(`Pixel layer: error loading site <strong>${siteId}</strong>.`);
+        alert(err.message);
+      });
+  };
+
+  [flashRapidCheckbox, flashCheckbox, basinCheckbox, warningCheckbox].forEach(checkbox => {
+    checkbox.addEventListener("change", () => {
+      map.closePopup();
+      rebuildBasinLayer({ fit: false });
+    });
+  });
+
+  pixelsCheckbox.addEventListener("change", () => {
+    if (!pixelLayer) return;
+
+    if (pixelsCheckbox.checked) {
+      pixelLayer.addTo(map);
+      const features = pixelLayer.toGeoJSON()?.features || [];
+      highlightMaxPixel(features);
+      pixelStatus.innerHTML = "Pixel layer: visible.";
+    } else {
+      map.removeLayer(pixelLayer);
+      clearMaxPixelMarker();
+      pixelStatus.innerHTML = "Pixel layer: hidden.";
+    }
+  });
+
+  fetch(basinUrl)
+    .then(response => {
+      if (!response.ok) throw new Error(`Failed loading basin GeoJSON: ${response.status}`);
+      return response.json();
+    })
+    .then(data => {
+      if (!data.features || data.features.length === 0) {
+        alert("No basin alerts found for this run.");
+        return;
+      }
+      basinFeatures = [...data.features];
+      rebuildBasinLayer({ fit: true });
+    })
+    .catch(err => {
+      console.error(err);
+      alert(err.message);
+    });
+});
+</script>
+
+{% endblock %}

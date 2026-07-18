@@ -1,0 +1,24 @@
+{% extends "tethys_apps/app_header_content.html" %}
+{% load tethys static %}
+{% block title %}{{ block.super }} - Home{% endblock %}
+
+{% block styles %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'usgs_water_stage_qc/css/downloading.css' %}">
+{% endblock %}
+
+{% block app_content %}
+<input type="hidden" id="csrf-token" value="{{ csrf_token }}">
+<input type="hidden" id="state-name" value="{{ state }}">
+<input type="hidden" id="run-id" value="{{ run_id }}">
+<input type="hidden" id="workers" value="{{ workers }}">
+<div class="loading-container">
+    <p>Generating flood alert results...</p>
+  <div class="spinner"></div>
+</div>
+<div class="error-message-container">
+  <p class="error-message"></p>
+  <button onclick=returnToPreviousPage() class="btn btn-primary">Return</button>
+</div>
+<script src="{% static 'usgs_water_stage_qc/js/flood_alert_generating.js' %}"></script>
+{% endblock %}

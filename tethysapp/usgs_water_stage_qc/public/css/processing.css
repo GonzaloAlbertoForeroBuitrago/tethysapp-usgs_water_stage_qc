@@ -1,0 +1,75 @@
+.process-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  padding: 48px 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  max-width: 420px;
+  margin: 80px auto;
+}
+
+.process-container h2 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.process-container p {
+  font-size: 0.95rem;
+  color: #6b7280;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.spinner-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.spinner {
+  width: 52px;
+  height: 52px;
+  border: 5px solid #e0e0e0;
+  border-top-color: #4caf50;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner-label {
+  font-size: 0.82rem;
+  color: #9ca3af;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error state */
+.error-message-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  padding: 40px 48px;
+  max-width: 420px;
+  margin: 80px auto;
+  text-align: center;
+  display: none;
+}
+
+.error-icon {
+  font-size: 36px;
+  margin-bottom: 16px;
+}
+
+.error-message {
+  color: #b91c1c;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}

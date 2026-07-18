@@ -1,0 +1,80 @@
+{% extends "usgs_water_stage_qc/base.html" %}
+{% load static %}
+
+{% block title %}{{ block.super }} - Flood Alert{% endblock %}
+
+{% block app_content %}
+<div class="container-fluid py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-9">
+
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+          <h2 class="mb-3">Operational Flood Alerts</h2>
+          <p class="text-muted mb-0">
+            Select a state and time window to provide basin alerts and historical flood context 
+            for operational decision-making in less than one minute.
+        </div>
+      </div>
+
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+          <h5 class="card-title mb-3">Run Flood Stage Alerts</h5>
+
+          <form method="post" action="{% url 'usgs_water_stage_qc:run_flood_alert' %}">
+            {% csrf_token %}
+
+            <div class="mb-3">
+              <label for="state" class="form-label">State</label>
+              <select id="state" name="state" class="form-select">
+                {% for state in states %}
+                  <option value="{{ state.0 }}">{{ state.1 }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label for="start_datetime" class="form-label">Start datetime</label>
+              <input
+                id="start_datetime"
+                name="start_datetime"
+                type="datetime-local"
+                class="form-control"
+              >
+            </div>
+
+            <div class="mb-3">
+              <label for="end_datetime" class="form-label">End datetime</label>
+              <input
+                id="end_datetime"
+                name="end_datetime"
+                type="datetime-local"
+                class="form-control"
+              >
+            </div>
+
+            <div class="mb-3">
+              <label for="workers" class="form-label">Workers</label>
+              <input
+                id="workers"
+                name="workers"
+                type="number"
+                class="form-control"
+                value="4"
+                min="1"
+                max="16"
+              >
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+              Run Flood Alert
+            </button>
+          </form>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

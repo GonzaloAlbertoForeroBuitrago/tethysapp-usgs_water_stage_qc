@@ -1,0 +1,486 @@
+{% extends "usgs_water_stage_qc/base.html" %}
+{% load static %}
+
+{% block styles %}
+  {{ block.super }}
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
+  />
+  <style>
+    .viewer-shell {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .viewer-card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 1rem 1.25rem;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+    }
+
+    .viewer-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .viewer-modes {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .mode-btn {
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #0f172a;
+      border-radius: 10px;
+      padding: 0.55rem 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .mode-btn:hover {
+      border-color: #0f4c81;
+      color: #0f4c81;
+    }
+
+    .mode-btn.active {
+      background: #0f4c81;
+      border-color: #0f4c81;
+      color: #ffffff;
+    }
+
+    .viewer-toolbar {
+      display: grid;
+      grid-template-columns: 110px minmax(240px, 1fr) minmax(240px, auto) minmax(300px, auto);
+      gap: 0.9rem;
+      align-items: center;
+    }
+
+    .viewer-toolbar label {
+      margin: 0;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .slider-wrap {
+      display: flex;
+      align-items: center;
+      width: 100%;
+    }
+
+    #tSlider {
+      width: 100%;
+      accent-color: #0f4c81;
+    }
+
+    .time-readout,
+    .info-readout {
+      font-size: 0.95rem;
+      color: #334155;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .helper-text {
+      color: #64748b;
+      margin: 0;
+      font-size: 0.95rem;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    #map {
+      height: calc(100vh - 285px);
+      min-height: 620px;
+      width: 100%;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .leaflet-popup-content {
+      font-size: 0.92rem;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 1200px) {
+      .viewer-toolbar {
+        grid-template-columns: 1fr;
+      }
+
+      .time-readout,
+      .info-readout {
+        white-space: normal;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block app_content %}
+  <div class="viewer-shell">
+    <div class="viewer-card">
+      <div class="viewer-topbar">
+        <div class="viewer-modes">
+          <button id="temporalModeBtn" class="mode-btn active" type="button">
+            Temporal Rainfall
+          </button>
+          <button id="recurrenceModeBtn" class="mode-btn" type="button">
+            Max-Pixel Recurrence
+          </button>
+        </div>
+
+        <div class="helper-text">
+          Valid time steps: {{ n_valid_times }} | Recurrence max count: {{ recurrence_max_count }}
+        </div>
+      </div>
+
+      <div id="temporalToolbar" class="viewer-toolbar">
+        <label for="tSlider">Time Step</label>
+
+        <div class="slider-wrap">
+          <input
+            id="tSlider"
+            type="range"
+            min="0"
+            max="{{ slider_max }}"
+            step="1"
+            value="{{ slider_t0 }}"
+          />
+        </div>
+
+        <div id="timeLabel" class="time-readout">Loading time...</div>
+        <div id="temporalInfoLabel" class="info-readout">Loading maximum pixel...</div>
+      </div>
+
+      <div id="recurrenceToolbar" class="viewer-toolbar hidden">
+        <label>Mode</label>
+        <div class="helper-text">Spatial recurrence of the hourly maximum-rainfall pixel.</div>
+        <div id="recurrenceLabel" class="time-readout">Counting how often the maximum fell on each pixel.</div>
+        <div id="recurrenceInfoLabel" class="info-readout">Dark red represents pixels with recurrence greater than 8.</div>
+      </div>
+
+      <p id="temporalHelp" class="helper-text mt-3 mb-0">
+        Drag the slider to move through timestamps that contain rainfall data. Click the map to inspect the nearest rainfall pixel and automatically track the hourly maximum pixel.
+      </p>
+
+      <p id="recurrenceHelp" class="helper-text mt-3 mb-0 hidden">
+        This view shows how many times each pixel was the maximum hourly rainfall pixel across the valid time steps. Click the map to inspect the recurrence count at a location.
+      </p>
+    </div>
+
+    <div class="viewer-card p-2">
+      <div id="map"></div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  {{ block.super }}
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    crossorigin=""
+  ></script>
+
+  <script>
+    window.addEventListener("load", () => {
+      const temporalTileTemplate = "{{ tile_url_template|escapejs }}/";
+      const temporalValueUrl = "{{ value_url|escapejs }}";
+      const maxPixelUrl = "{{ max_pixel_url|escapejs }}";
+
+      const recurrenceTileTemplate = "{{ recurrence_tile_url_template|escapejs }}/";
+      const recurrenceValueUrl = "{{ recurrence_value_url|escapejs }}";
+
+      console.log("recurrenceValueUrl:", recurrenceValueUrl);
+      console.log("recurrenceTileTemplate:", recurrenceTileTemplate);
+
+      const sliderMax = Number("{{ slider_max }}");
+      const initialSliderIndex = Number("{{ slider_t0 }}");
+
+      const validTimeIndices = JSON.parse('{{ valid_time_indices_json|escapejs }}');
+      const validTimesIso = JSON.parse('{{ valid_times_iso_json|escapejs }}');
+
+      const west = Number("{{ west|default:'' }}");
+      const south = Number("{{ south|default:'' }}");
+      const east = Number("{{ east|default:'' }}");
+      const north = Number("{{ north|default:'' }}");
+
+      const temporalModeBtn = document.getElementById("temporalModeBtn");
+      const recurrenceModeBtn = document.getElementById("recurrenceModeBtn");
+
+      const temporalToolbar = document.getElementById("temporalToolbar");
+      const recurrenceToolbar = document.getElementById("recurrenceToolbar");
+
+      const temporalHelp = document.getElementById("temporalHelp");
+      const recurrenceHelp = document.getElementById("recurrenceHelp");
+
+      const sliderEl = document.getElementById("tSlider");
+      const timeLabelEl = document.getElementById("timeLabel");
+      const temporalInfoLabelEl = document.getElementById("temporalInfoLabel");
+
+      const clampSliderIndex = (index) => Math.max(0, Math.min(sliderMax, Number.parseInt(index, 10) || 0));
+      const actualTimeIndex = (sliderIndex) => validTimeIndices[sliderIndex];
+      const formatTimeLabel = (sliderIndex) => validTimesIso[sliderIndex] ?? `Index ${sliderIndex}`;
+
+      let currentMode = "temporal";
+      let currentSliderIndex = clampSliderIndex(initialSliderIndex);
+      let currentActualTimeIndex = actualTimeIndex(currentSliderIndex);
+
+      let overlayLayer = null;
+      let maxMarker = null;
+      let animationFrameId = null;
+      let maxRequestId = 0;
+      let popupRequestId = 0;
+
+      const map = L.map("map", { preferCanvas: true });
+
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors",
+      }).addTo(map);
+
+      if (
+        Number.isFinite(west) &&
+        Number.isFinite(south) &&
+        Number.isFinite(east) &&
+        Number.isFinite(north)
+      ) {
+        map.fitBounds([[south, west], [north, east]], {
+          maxZoom: 11,
+          padding: [20, 20],
+        });
+      } else {
+        map.setView([41.9, -93.6], 6);
+      }
+
+      const popup = L.popup();
+
+      const buildTemporalLayer = (timeIndex) => L.tileLayer(
+        temporalTileTemplate.replace("{t}", String(timeIndex)),
+        {
+          tileSize: 256,
+          maxNativeZoom: 9,
+          maxZoom: 19,
+          opacity: 1,
+          updateWhenIdle: true,
+          updateWhenZooming: false,
+          keepBuffer: 2,
+        }
+      );
+
+      const buildRecurrenceLayer = () => L.tileLayer(
+        recurrenceTileTemplate,
+        {
+          tileSize: 256,
+          maxNativeZoom: 9,
+          maxZoom: 19,
+          opacity: 1,
+          updateWhenIdle: true,
+          updateWhenZooming: false,
+          keepBuffer: 2,
+        }
+      );
+
+      const setOverlayLayer = (layer) => {
+        if (overlayLayer) {
+          map.removeLayer(overlayLayer);
+        }
+        overlayLayer = layer;
+        overlayLayer.addTo(map);
+      };
+
+      const clearMaxMarker = () => {
+        if (maxMarker) {
+          map.removeLayer(maxMarker);
+          maxMarker = null;
+        }
+      };
+
+      const setTemporalModeUi = () => {
+        currentMode = "temporal";
+        temporalModeBtn.classList.add("active");
+        recurrenceModeBtn.classList.remove("active");
+        temporalToolbar.classList.remove("hidden");
+        recurrenceToolbar.classList.add("hidden");
+        temporalHelp.classList.remove("hidden");
+        recurrenceHelp.classList.add("hidden");
+      };
+
+      const setRecurrenceModeUi = () => {
+        currentMode = "recurrence";
+        recurrenceModeBtn.classList.add("active");
+        temporalModeBtn.classList.remove("active");
+        recurrenceToolbar.classList.remove("hidden");
+        temporalToolbar.classList.add("hidden");
+        recurrenceHelp.classList.remove("hidden");
+        temporalHelp.classList.add("hidden");
+      };
+
+      const setTimeLabel = (sliderIndex) => {
+        timeLabelEl.textContent = formatTimeLabel(sliderIndex);
+      };
+
+      const setTemporalInfoLabel = (value, lat, lon) => {
+        temporalInfoLabelEl.textContent =
+          `Maximum rainfall: ${value.toFixed(3)} mm/h at ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+      };
+
+      const setTemporalInfoEmpty = () => {
+        temporalInfoLabelEl.textContent = "Maximum rainfall: no rainfall detected";
+      };
+
+      const updateMaxPixel = async (timeIndex) => {
+        const requestId = ++maxRequestId;
+        const response = await fetch(`${maxPixelUrl}?t=${encodeURIComponent(timeIndex)}`);
+        const data = await response.json();
+
+        if (requestId !== maxRequestId || currentMode !== "temporal") {
+          return;
+        }
+
+        if (!data.ok || data.lat === null || data.lon === null || data.value_mmph === null) {
+          clearMaxMarker();
+          setTemporalInfoEmpty();
+          return;
+        }
+
+        const latLng = [Number(data.lat), Number(data.lon)];
+        clearMaxMarker();
+
+        maxMarker = L.circleMarker(latLng, {
+          radius: 12,
+          weight: 3,
+          color: "#000000",
+          fill: false,
+          opacity: 1.0,
+        }).addTo(map);
+
+        maxMarker.bindTooltip(
+          `Maximum rainfall<br>${Number(data.value_mmph).toFixed(3)} mm/h`,
+          {
+            direction: "top",
+            offset: [0, -10],
+          }
+        );
+
+        setTemporalInfoLabel(Number(data.value_mmph), latLng[0], latLng[1]);
+      };
+
+      const applyTemporalStep = async (sliderIndex) => {
+        currentSliderIndex = clampSliderIndex(sliderIndex);
+        currentActualTimeIndex = actualTimeIndex(currentSliderIndex);
+
+        sliderEl.value = String(currentSliderIndex);
+        setTimeLabel(currentSliderIndex);
+        setOverlayLayer(buildTemporalLayer(currentActualTimeIndex));
+        await updateMaxPixel(currentActualTimeIndex);
+      };
+
+      const queueTemporalStep = (sliderIndex) => {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(() => {
+          applyTemporalStep(sliderIndex).catch((error) => {
+            console.error("Failed to update temporal step:", error);
+          });
+        });
+      };
+
+      const enterTemporalMode = () => {
+        setTemporalModeUi();
+        queueTemporalStep(currentSliderIndex);
+      };
+
+      const enterRecurrenceMode = () => {
+        setRecurrenceModeUi();
+        clearMaxMarker();
+        setOverlayLayer(buildRecurrenceLayer());
+      };
+
+      map.on("click", async (event) => {
+        const requestId = ++popupRequestId;
+        const lat = event.latlng.lat;
+        const lon = event.latlng.lng;
+
+        popup
+          .setLatLng(event.latlng)
+          .setContent("Loading nearest pixel value...")
+          .openOn(map);
+
+        try {
+          if (currentMode === "temporal") {
+            const response = await fetch(
+              `${temporalValueUrl}?t=${encodeURIComponent(currentActualTimeIndex)}&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`
+            );
+            const data = await response.json();
+
+            if (requestId !== popupRequestId || currentMode !== "temporal") {
+              return;
+            }
+
+            const value = data.value_mmph;
+            const valueText = value === null || value === undefined
+              ? "<b>No data</b>"
+              : `<b>${Number(value).toFixed(3)} mm/h</b>`;
+
+            popup.setContent(
+              `${valueText}<br>` +
+              `<span>${formatTimeLabel(currentSliderIndex)}</span><br>` +
+              `<span>lat=${lat.toFixed(5)}, lon=${lon.toFixed(5)}</span>`
+            );
+            return;
+          }
+
+          const response = await fetch(
+            `${recurrenceValueUrl}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`
+          );
+
+          const contentType = response.headers.get("content-type") || "";
+          if (!contentType.includes("application/json")) {
+            const text = await response.text();
+            throw new Error(`Recurrence endpoint returned non-JSON content: ${text.slice(0, 120)}`);
+          }
+
+          const data = await response.json();
+
+          if (requestId !== popupRequestId || currentMode !== "recurrence") {
+            return;
+          }
+
+          popup.setContent(
+            `<b>${Number(data.count).toFixed(0)} times</b><br>` +
+            `<span>Pixel was the hourly maximum rainfall location this many times.</span><br>` +
+            `<span>lat=${lat.toFixed(5)}, lon=${lon.toFixed(5)}</span>`
+          );
+        } catch (error) {
+          if (requestId !== popupRequestId) {
+            return;
+          }
+
+          popup.setContent(`<b>Error</b><br>${error.message || error}`);
+        }
+      });
+
+      sliderEl.addEventListener("input", (event) => {
+        if (currentMode === "temporal") {
+          queueTemporalStep(event.target.value);
+        }
+      });
+
+      temporalModeBtn.addEventListener("click", enterTemporalMode);
+      recurrenceModeBtn.addEventListener("click", enterRecurrenceMode);
+
+      enterTemporalMode();
+    });
+  </script>
+{% endblock %}
