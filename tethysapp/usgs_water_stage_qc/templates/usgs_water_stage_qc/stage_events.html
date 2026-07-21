@@ -1,4 +1,5 @@
 {% extends "usgs_water_stage_qc/base.html" %}
+{% load tethys %}
 
 {% block app_content %}
 
@@ -7,34 +8,143 @@
     <h2>Stage Event Visualization</h2>
 
     <p class="text-muted">
-        Independent visualization page for downloaded USGS water-stage data.
+        Summary of the downloaded USGS water-stage dataset.
     </p>
 
     <hr>
 
-    <div class="card">
-        <div class="card-body">
+    {% if data_error %}
+        <div class="alert alert-danger" role="alert">
+            <strong>Unable to load stage data</strong>
 
-            <table class="table">
-                <tbody>
-                    <tr>
-                        <th>State</th>
-                        <td>{{ state }}</td>
-                    </tr>
+            <div>
+                {{ data_error }}
+            </div>
 
-                    <tr>
-                        <th>USGS Gage ID</th>
-                        <td>{{ gage_id }}</td>
-                    </tr>
-                </tbody>
-            </table>
+            <hr>
 
-            <p>
-                The HydroEventDetector plot will be added here.
-            </p>
+            <div>
+                Downloaded-data directory:
+            </div>
 
+            <code>{{ data_directory }}</code>
         </div>
-    </div>
+    {% endif %}
+
+    {% if data_summary %}
+        <div class="card">
+            <div class="card-body">
+
+                <h4 class="card-title">
+                    {{ data_summary.station_name|default:"USGS Station" }}
+                </h4>
+
+                <table class="table">
+                    <tbody>
+                        <tr>
+                            <th>State</th>
+                            <td>{{ state }}</td>
+                        </tr>
+
+                        <tr>
+                            <th>USGS Gage ID</th>
+                            <td>{{ gage_id }}</td>
+                        </tr>
+
+                        <tr>
+                            <th>Observations</th>
+                            <td>{{ data_summary.observation_rows }}</td>
+                        </tr>
+
+                        <tr>
+                            <th>HydroEventDetector rows</th>
+                            <td>
+                                {{ data_summary.hydroeventdetector_rows }}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th>Excluded observations</th>
+                            <td>{{ data_summary.excluded_rows }}</td>
+                        </tr>
+
+                        <tr>
+                            <th>First observation</th>
+                            <td>{{ data_summary.first_observation }}</td>
+                        </tr>
+
+                        <tr>
+                            <th>Last observation</th>
+                            <td>{{ data_summary.last_observation }}</td>
+                        </tr>
+
+                        <tr>
+                            <th>Minimum stage</th>
+                            <td>
+                                {{ data_summary.minimum_stage }}
+                                {{ data_summary.unit }}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th>Maximum stage</th>
+                            <td>
+                                {{ data_summary.maximum_stage }}
+                                {{ data_summary.unit }}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th>Latitude</th>
+                            <td>{{ data_summary.latitude }}</td>
+                        </tr>
+
+                        <tr>
+                            <th>Longitude</th>
+                            <td>{{ data_summary.longitude }}</td>
+                        </tr>
+
+                        <tr>
+                            <th>Data directory</th>
+                            <td>
+                                <code>{{ data_directory }}</code>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+            </div>
+        </div>
+    {% endif %}
+
+    {% if plot_error %}
+        <div class="alert alert-warning mt-4" role="alert">
+            <strong>Unable to create stage plot</strong>
+
+            <div>
+                {{ plot_error }}
+            </div>
+        </div>
+    {% endif %}
+
+    {% if stage_plot %}
+        <div class="card mt-4">
+            <div class="card-body">
+
+                <h4 class="card-title">
+                    Water Stage Time Series
+                </h4>
+
+                <p class="text-muted">
+                    HydroEventDetector input time series. Datetimes are shown
+                    in UTC.
+                </p>
+
+                {% gizmo stage_plot %}
+
+            </div>
+        </div>
+    {% endif %}
 
 </div>
 
