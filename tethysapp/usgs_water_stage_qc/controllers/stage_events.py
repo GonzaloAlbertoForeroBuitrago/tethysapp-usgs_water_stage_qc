@@ -158,7 +158,7 @@ def stage_events(request, state, gage_id, app_media):
             )
 
         else:
-            plot_data = (
+            stage_plot_data = (
                 baseflow_data[
                     [
                         "datetime",
@@ -167,19 +167,26 @@ def stage_events(request, state, gage_id, app_media):
                         "stage_above_baseflow_ft",
                     ]
                 ]
-                .dropna(
-                    subset=[
-                        "datetime",
-                        "Stage_ft",
-                        "baseflow_ft",
-                    ]
-                )
+                .dropna(subset=["datetime", "Stage_ft"])
                 .sort_values("datetime")
             )
 
-            if plot_data.empty:
+            baseflow_plot_data = (
+                baseflow_data[
+                    [
+                        "datetime",
+                        "Stage_ft",
+                        "baseflow_ft",
+                        "stage_above_baseflow_ft",
+                    ]
+                ]
+                .dropna(subset=["datetime", "baseflow_ft"])
+                .sort_values("datetime")
+            )
+
+            if stage_plot_data.empty:
                 context["plot_error"] = (
-                    "No valid stage and baseflow observations are "
+                    "No valid water-stage observations are "
                     "available for plotting."
                 )
 
@@ -188,19 +195,20 @@ def stage_events(request, state, gage_id, app_media):
 
                 stage_figure.add_trace(
                     go.Scattergl(
-                        x=plot_data["datetime"],
-                        y=plot_data["Stage_ft"],
+                        x=stage_plot_data["datetime"],
+                        y=stage_plot_data["Stage_ft"],
                         mode="lines",
                         name="Observed Stage",
                         line={
                             "width": 1.2,
                         },
-                        customdata=plot_data[
+                        customdata=stage_plot_data[
                             [
                                 "baseflow_ft",
                                 "stage_above_baseflow_ft",
                             ]
                         ],
+                        connectgaps=False,
                         hovertemplate=(
                             "<b>Observed Stage</b><br>"
                             "Datetime: %{x|%Y-%m-%d %H:%M}<br>"
@@ -213,33 +221,36 @@ def stage_events(request, state, gage_id, app_media):
                     )
                 )
 
-                stage_figure.add_trace(
-                    go.Scattergl(
-                        x=plot_data["datetime"],
-                        y=plot_data["baseflow_ft"],
-                        mode="lines",
-                        name="Baseflow",
-                        line={
-                            "width": 1.2,
-                            "dash": "dash",
-                        },
-                        customdata=plot_data[
-                            [
-                                "Stage_ft",
-                                "stage_above_baseflow_ft",
-                            ]
-                        ],
-                        hovertemplate=(
-                            "<b>Baseflow</b><br>"
-                            "Datetime: %{x|%Y-%m-%d %H:%M}<br>"
-                            "Baseflow: %{y:.2f} ft<br>"
-                            "Observed stage: %{customdata[0]:.2f} ft<br>"
-                            "Stage above baseflow: "
-                            "%{customdata[1]:.2f} ft"
-                            "<extra></extra>"
-                        ),
+                if not baseflow_plot_data.empty:
+                    stage_figure.add_trace(
+                        go.Scattergl(
+                            x=baseflow_plot_data["datetime"],
+                            y=baseflow_plot_data["baseflow_ft"],
+                            mode="lines",
+                            name="Baseflow",
+                            line={
+                                "width": 1.2,
+                                "dash": "dash",
+                            },
+                            customdata=baseflow_plot_data[
+                                [
+                                    "Stage_ft",
+                                    "stage_above_baseflow_ft",
+                                ]
+                            ],
+                            connectgaps=False,
+                            hovertemplate=(
+                                "<b>Baseflow</b><br>"
+                                "Datetime: %{x|%Y-%m-%d %H:%M}<br>"
+                                "Baseflow: %{y:.2f} ft<br>"
+                                "Observed stage: "
+                                "%{customdata[0]:.2f} ft<br>"
+                                "Stage above baseflow: "
+                                "%{customdata[1]:.2f} ft"
+                                "<extra></extra>"
+                            ),
+                        )
                     )
-                )
 
                 stage_figure.update_layout(
                     title={

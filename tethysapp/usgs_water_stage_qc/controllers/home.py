@@ -167,17 +167,40 @@ def do_download_stage(request, state, gage_id, app_media):
     start_date = request.POST["start_date"]
     end_date = request.POST["end_date"]
 
+    state_upper = state.upper().strip()
+    gage_id_clean = gage_id.strip()
+
     context = {
-        "state": state.upper(),
-        "gage_id": gage_id,
+        "state": state_upper,
+        "gage_id": gage_id_clean,
         "default_start_date": start_date,
         "default_end_date": end_date,
     }
 
     try:
+        station_directory = (
+            Path(app_media.path)
+            / "stage_data"
+            / state_upper
+            / gage_id_clean
+        )
+
+        # Directories containing stage files from previous runs.
+        stage_directories = [
+            station_directory / "downloaded_data",
+            station_directory / "processed_events",
+            station_directory / "processed_data",
+        ]
+
+        # Begin every new stage download with a clean station workspace.
+        # This does not affect basin files or data from other stations.
+        for directory in stage_directories:
+            if directory.exists():
+                shutil.rmtree(directory)
+
         result = download_stage_data(
-            state=state,
-            site_id=gage_id,
+            state=state_upper,
+            site_id=gage_id_clean,
             start_date=start_date,
             end_date=end_date,
             output_root=Path(app_media.path) / "stage_data",
