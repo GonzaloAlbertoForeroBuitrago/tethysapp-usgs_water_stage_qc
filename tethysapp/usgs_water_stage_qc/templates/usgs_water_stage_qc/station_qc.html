@@ -155,6 +155,14 @@
                         </tr>
                     </tbody>
                 </table>
+
+                <a
+                    href="{% url 'usgs_water_stage_qc:stage_events' state=state gage_id=gage_id %}"
+                    class="btn btn-success btn-lg"
+                    style="margin-top: 15px;"
+                >
+                    View Stage Events
+                </a>
             </div>
         </div>
     {% endif %}

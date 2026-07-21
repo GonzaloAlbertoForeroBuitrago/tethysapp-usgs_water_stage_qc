@@ -1,0 +1,41 @@
+{% extends "usgs_water_stage_qc/base.html" %}
+
+{% block app_content %}
+
+<div class="container" style="max-width: 1100px; margin-top: 30px;">
+
+    <h2>Stage Event Visualization</h2>
+
+    <p class="text-muted">
+        Independent visualization page for downloaded USGS water-stage data.
+    </p>
+
+    <hr>
+
+    <div class="card">
+        <div class="card-body">
+
+            <table class="table">
+                <tbody>
+                    <tr>
+                        <th>State</th>
+                        <td>{{ state }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>USGS Gage ID</th>
+                        <td>{{ gage_id }}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>
+                The HydroEventDetector plot will be added here.
+            </p>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
