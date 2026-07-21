@@ -1,4 +1,164 @@
 {% extends "usgs_water_stage_qc/base.html" %}
 
 {% block app_content %}
+
+<div class="container" style="max-width: 760px; margin-top: 30px;">
+
+    <h2>USGS Water Stage QC</h2>
+
+    <p class="text-muted">
+        Select the period to download water-stage observations.
+    </p>
+
+    <hr>
+
+    <form
+        method="post"
+        action="{% url 'usgs_water_stage_qc:do_download_zarr_endpoint' state=state gage_id=gage_id %}"
+    >
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label for="state">
+                <strong>State</strong>
+            </label>
+
+            <input
+                id="state"
+                class="form-control"
+                value="{{ state }}"
+                readonly
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="gage-id">
+                <strong>USGS Gage ID</strong>
+            </label>
+
+            <input
+                id="gage-id"
+                class="form-control"
+                value="{{ gage_id }}"
+                readonly
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="start-date">
+                <strong>Start Date</strong>
+            </label>
+
+            <input
+                id="start-date"
+                type="date"
+                name="start_date"
+                class="form-control"
+                value="{{ default_start_date }}"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="end-date">
+                <strong>End Date</strong>
+            </label>
+
+            <input
+                id="end-date"
+                type="date"
+                name="end_date"
+                class="form-control"
+                value="{{ default_end_date }}"
+                required
+            >
+        </div>
+
+        <button
+            type="submit"
+            class="btn btn-primary btn-lg"
+        >
+            Download Stage Data
+        </button>
+    </form>
+
+    {% if download_error %}
+        <div
+            class="alert alert-danger"
+            role="alert"
+            style="margin-top: 25px;"
+        >
+            <strong>Download failed</strong>
+            <div>{{ download_error }}</div>
+        </div>
+    {% endif %}
+
+    {% if download_result %}
+        <div
+            class="card"
+            style="margin-top: 25px;"
+        >
+            <div class="card-body">
+                <h4 class="card-title">
+                    Download Complete
+                </h4>
+
+                <table class="table">
+                    <tbody>
+                        <tr>
+                            <th>Source</th>
+                            <td>{{ download_result.source }}</td>
+                        </tr>
+
+                        <tr>
+                            <th>Observations</th>
+                            <td>
+                                {{ download_result.observation_rows }}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th>HydroEventDetector rows</th>
+                            <td>
+                                {{ download_result.hydroeventdetector_rows }}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th>Excluded observations</th>
+                            <td>
+                                {{ download_result.excluded_rows }}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th>First observation</th>
+                            <td>
+                                {{ download_result.first_observation }}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th>Last observation</th>
+                            <td>
+                                {{ download_result.last_observation }}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th>Output directory</th>
+                            <td>
+                                <code>
+                                    {{ download_result.output_directory }}
+                                </code>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+</div>
+
 {% endblock %}

@@ -11,6 +11,7 @@ from tethys_sdk.layouts import MapLayout
 from tethys_sdk.gizmos import MVView
 
 from ..app import App
+from usgs_gage_qc.stage_download import download_stage_data
 from ..s3_utils import download_basin_geojson_files, download_zarr_file
 from ..mrms_tiles import get_mrms_meta
 from ..basin_utils import (
@@ -144,16 +145,17 @@ def do_download_basin(request, state, app_media):
 
 @controller(name="download_stage", url="download_stage/{state}/{gage_id}/")
 def download_stage(request, state, gage_id):
-    state = state.title()
+    from datetime import date
 
     context = {
-        "state": state,
+        "state": state.upper(),
         "gage_id": gage_id,
-        "process_type": "zarr_download",
-        "message": f"Downloading data for gage ID {gage_id} in {state}...",
+        "default_start_date": "2019-01-01",
+        "default_end_date": date.today().isoformat(),
     }
-    
-    return App.render(request, "processing.html", context)
+
+    return App.render(request, "station_qc.html", context)
+
 
 
 @controller(
@@ -162,17 +164,48 @@ def download_stage(request, state, gage_id):
     app_media=True,
 )
 def do_download_stage(request, state, gage_id, app_media):
-    """
-    Temporary basin-selection endpoint.
+    start_date = request.POST["start_date"]
+    end_date = request.POST["end_date"]
 
-    The existing spinner and navigation flow are preserved.
-    Water-stage downloading and quality control will be added here.
-    """
-    return JsonResponse({
-        "status": "success",
+    context = {
         "state": state.upper(),
         "gage_id": gage_id,
-    })
+        "default_start_date": start_date,
+        "default_end_date": end_date,
+    }
+
+    try:
+        result = download_stage_data(
+            state=state,
+            site_id=gage_id,
+            start_date=start_date,
+            end_date=end_date,
+            output_root=Path(app_media.path) / "stage_data",
+        )
+
+        observations = result.observations
+
+        context["download_result"] = {
+            "source": result.source,
+            "observation_rows": len(observations),
+            "hydroeventdetector_rows": len(
+                result.hydroeventdetector_input
+            ),
+            "excluded_rows": len(result.excluded_observations),
+            "first_observation": observations["datetime"].min(),
+            "last_observation": observations["datetime"].max(),
+            "output_directory": result.output_directory,
+        }
+
+    except Exception as exc:
+        context["download_error"] = str(exc)
+
+    return App.render(
+        request,
+        "station_qc.html",
+        context,
+    )
+
 
 
 @controller(name="state_basin", url="basin/{state}/", app_media=True)
