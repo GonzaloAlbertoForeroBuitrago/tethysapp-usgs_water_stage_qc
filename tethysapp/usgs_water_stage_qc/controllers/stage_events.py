@@ -133,83 +133,155 @@ def stage_events(request, state, gage_id, app_media):
             "longitude": longitude,
         }
 
-        if hydro_data.empty:
+        required_plot_columns = {
+            "datetime",
+            "Stage_ft",
+            "baseflow_ft",
+            "stage_above_baseflow_ft",
+        }
+
+        if baseflow_data.empty:
             context["plot_error"] = (
-                "The HydroEventDetector dataset contains no observations."
+                "The processed stage and baseflow dataset contains "
+                "no observations."
             )
 
-        elif not {"datetime", "Stage_ft"}.issubset(hydro_data.columns):
+        elif not required_plot_columns.issubset(baseflow_data.columns):
+            missing_plot_columns = sorted(
+                required_plot_columns - set(baseflow_data.columns)
+            )
+
             context["plot_error"] = (
-                "The HydroEventDetector dataset does not contain the "
-                "required datetime and Stage_ft columns."
+                "The processed dataset is missing the following "
+                "required columns: "
+                + ", ".join(missing_plot_columns)
             )
 
         else:
             plot_data = (
-                hydro_data[["datetime", "Stage_ft"]]
-                .dropna(subset=["datetime", "Stage_ft"])
+                baseflow_data[
+                    [
+                        "datetime",
+                        "Stage_ft",
+                        "baseflow_ft",
+                        "stage_above_baseflow_ft",
+                    ]
+                ]
+                .dropna(
+                    subset=[
+                        "datetime",
+                        "Stage_ft",
+                        "baseflow_ft",
+                    ]
+                )
                 .sort_values("datetime")
             )
 
-            stage_figure = go.Figure()
-
-            stage_figure.add_trace(
-                go.Scattergl(
-                    x=plot_data["datetime"],
-                    y=plot_data["Stage_ft"],
-                    mode="lines",
-                    name="Stage",
-                    line={
-                        "width": 1.2,
-                    },
-                    hovertemplate=(
-                        "<b>Stage</b><br>"
-                        "Datetime: %{x|%Y-%m-%d %H:%M}<br>"
-                        "Stage: %{y:.2f} ft"
-                        "<extra></extra>"
-                    ),
+            if plot_data.empty:
+                context["plot_error"] = (
+                    "No valid stage and baseflow observations are "
+                    "available for plotting."
                 )
-            )
 
-            stage_figure.update_layout(
-                title={
-                    "text": "USGS Water Stage Time Series",
-                    "x": 0.5,
-                },
-                xaxis={
-                    "title": "Datetime (UTC)",
-                    "rangeslider": {
-                        "visible": True,
+            else:
+                stage_figure = go.Figure()
+
+                stage_figure.add_trace(
+                    go.Scattergl(
+                        x=plot_data["datetime"],
+                        y=plot_data["Stage_ft"],
+                        mode="lines",
+                        name="Observed Stage",
+                        line={
+                            "width": 1.2,
+                        },
+                        customdata=plot_data[
+                            [
+                                "baseflow_ft",
+                                "stage_above_baseflow_ft",
+                            ]
+                        ],
+                        hovertemplate=(
+                            "<b>Observed Stage</b><br>"
+                            "Datetime: %{x|%Y-%m-%d %H:%M}<br>"
+                            "Stage: %{y:.2f} ft<br>"
+                            "Baseflow: %{customdata[0]:.2f} ft<br>"
+                            "Stage above baseflow: "
+                            "%{customdata[1]:.2f} ft"
+                            "<extra></extra>"
+                        ),
+                    )
+                )
+
+                stage_figure.add_trace(
+                    go.Scattergl(
+                        x=plot_data["datetime"],
+                        y=plot_data["baseflow_ft"],
+                        mode="lines",
+                        name="Baseflow",
+                        line={
+                            "width": 1.2,
+                            "dash": "dash",
+                        },
+                        customdata=plot_data[
+                            [
+                                "Stage_ft",
+                                "stage_above_baseflow_ft",
+                            ]
+                        ],
+                        hovertemplate=(
+                            "<b>Baseflow</b><br>"
+                            "Datetime: %{x|%Y-%m-%d %H:%M}<br>"
+                            "Baseflow: %{y:.2f} ft<br>"
+                            "Observed stage: %{customdata[0]:.2f} ft<br>"
+                            "Stage above baseflow: "
+                            "%{customdata[1]:.2f} ft"
+                            "<extra></extra>"
+                        ),
+                    )
+                )
+
+                stage_figure.update_layout(
+                    title={
+                        "text": (
+                            "USGS Water Stage and Baseflow Time Series"
+                        ),
+                        "x": 0.5,
                     },
-                    "showgrid": True,
-                },
-                yaxis={
-                    "title": "Stage (ft)",
-                    "showgrid": True,
-                },
-                hovermode="x unified",
-                template="plotly_white",
-                height=600,
-                margin={
-                    "l": 70,
-                    "r": 30,
-                    "t": 70,
-                    "b": 70,
-                },
-                legend={
-                    "orientation": "h",
-                    "yanchor": "bottom",
-                    "y": 1.02,
-                    "xanchor": "right",
-                    "x": 1,
-                },
-            )
+                    xaxis={
+                        "title": "Datetime (UTC)",
+                        "rangeslider": {
+                            "visible": True,
+                        },
+                        "showgrid": True,
+                    },
+                    yaxis={
+                        "title": "Stage (ft)",
+                        "showgrid": True,
+                    },
+                    hovermode="x unified",
+                    template="plotly_white",
+                    height=600,
+                    margin={
+                        "l": 70,
+                        "r": 30,
+                        "t": 70,
+                        "b": 70,
+                    },
+                    legend={
+                        "orientation": "h",
+                        "yanchor": "bottom",
+                        "y": 1.02,
+                        "xanchor": "right",
+                        "x": 1,
+                    },
+                )
 
-            context["stage_plot"] = PlotlyView(
-                stage_figure,
-                height="600px",
-                width="100%",
-            )
+                context["stage_plot"] = PlotlyView(
+                    stage_figure,
+                    height="600px",
+                    width="100%",
+                )
 
     except Exception as exc:
         context["data_error"] = str(exc)
