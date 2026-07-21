@@ -6,6 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from tethys_sdk.gizmos import PlotlyView
 from tethys_sdk.routing import controller
+from usgs_gage_qc.hydro_event_detector import detect_stage_events
 
 from ..app import App
 
@@ -19,18 +20,25 @@ def stage_events(request, state, gage_id, app_media):
     state_upper = state.upper().strip()
     gage_id_clean = gage_id.strip()
 
-    data_directory = (
+    gage_directory = (
         Path(app_media.path)
         / "stage_data"
         / state_upper
         / gage_id_clean
-        / "downloaded_data"
     )
+
+    data_directory = gage_directory / "downloaded_data"
+    processed_directory = gage_directory / "processed_events"
 
     observations_path = data_directory / "stage_observations.parquet"
     hydro_path = data_directory / "stage_hydroeventdetector.parquet"
     station_path = data_directory / "station_metadata.parquet"
     excluded_path = data_directory / "excluded_observations.parquet"
+
+    baseflow_path = processed_directory / "stage_baseflow.parquet"
+    selected_events_path = (
+        processed_directory / "stage_events_selected.parquet"
+    )
 
     context = {
         "state": state_upper,
@@ -64,10 +72,22 @@ def stage_events(request, state, gage_id, app_media):
         )
 
     try:
+        if (
+            not baseflow_path.exists()
+            or not selected_events_path.exists()
+        ):
+            detect_stage_events(
+                input_path=hydro_path,
+                output_directory=processed_directory,
+                site_id=gage_id_clean,
+            )
+
         observations = pd.read_parquet(observations_path)
         hydro_data = pd.read_parquet(hydro_path)
+        baseflow_data = pd.read_parquet(baseflow_path)
         station_metadata = pd.read_parquet(station_path)
         excluded_observations = pd.read_parquet(excluded_path)
+        selected_events = pd.read_parquet(selected_events_path)
 
         if observations.empty:
             first_observation = None
@@ -103,6 +123,7 @@ def stage_events(request, state, gage_id, app_media):
             "observation_rows": len(observations),
             "hydroeventdetector_rows": len(hydro_data),
             "excluded_rows": len(excluded_observations),
+            "selected_events": len(selected_events),
             "first_observation": first_observation,
             "last_observation": last_observation,
             "minimum_stage": stage_min,
