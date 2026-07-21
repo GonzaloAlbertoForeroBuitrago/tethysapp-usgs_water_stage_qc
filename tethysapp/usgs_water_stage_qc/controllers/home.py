@@ -142,8 +142,8 @@ def do_download_basin(request, state, app_media):
         )
 
 
-@controller(name="download_zarr", url="download_zarr/{state}/{gage_id}/")
-def download_zarr(request, state, gage_id):
+@controller(name="download_stage", url="download_stage/{state}/{gage_id}/")
+def download_stage(request, state, gage_id):
     state = state.title()
 
     context = {
@@ -158,28 +158,21 @@ def download_zarr(request, state, gage_id):
 
 @controller(
     name="do_download_zarr_endpoint",
-    url="do_download_zarr/{state}/{gage_id}/",
+    url="do_download_stage/{state}/{gage_id}/",
     app_media=True,
 )
-def do_download_zarr(request, state, gage_id, app_media):
-    state = state.upper()
+def do_download_stage(request, state, gage_id, app_media):
+    """
+    Temporary basin-selection endpoint.
 
-    try:
-        download_zarr_file(state, gage_id, app_media.path)
-
-        return JsonResponse({"status": "success"})
-
-    except FileNotFoundError as e:
-        return JsonResponse(
-            {"status": "error", "message": str(e)},
-            status=404,
-        )
-
-    except Exception as e:
-        return JsonResponse(
-            {"status": "error", "message": str(e)},
-            status=500,
-        )
+    The existing spinner and navigation flow are preserved.
+    Water-stage downloading and quality control will be added here.
+    """
+    return JsonResponse({
+        "status": "success",
+        "state": state.upper(),
+        "gage_id": gage_id,
+    })
 
 
 @controller(name="state_basin", url="basin/{state}/", app_media=True)
@@ -297,51 +290,13 @@ class StateBasinMapLayout(MapLayout):
     app_media=True,
 )
 def leaflet_mrms(request, state, gage_id, app_media):
-    app_media_path = app_media.path
-
-    zarr_path = os.path.join(
-        app_media_path,
-        "zarr_files",
-        f"{gage_id}.zarr",
-    )
-
-    if not os.path.exists(zarr_path):
-        return redirect(
-            "usgs_water_stage_qc:download_zarr",
-            state=state,
-            gage_id=gage_id,
-        )
-
-    meta = get_mrms_meta(gage_id)
-
-    valid_time_indices = meta["valid_time_indices"]
-    valid_times_iso = meta["valid_times_iso"]
-    valid_count = len(valid_time_indices)
-
-    slider_t0 = valid_count // 2 if valid_count else 0
-    slider_max = max(valid_count - 1, 0)
-
     context = {
-        "tile_url_template": f"/apps/usgs-water-stage-qc/mrms/tiles/{gage_id}/{{t}}/{{z}}/{{x}}/{{y}}",
-        "value_url": f"/apps/usgs-water-stage-qc/mrms/value_at/{gage_id}",
-        "max_pixel_url": f"/apps/usgs-water-stage-qc/mrms/max_pixel/{gage_id}",
-        "recurrence_tile_url_template": f"/apps/usgs-water-stage-qc/mrms/recurrence/tiles/{gage_id}/{{z}}/{{x}}/{{y}}",
-        "recurrence_value_url": f"/apps/usgs-water-stage-qc/mrms/recurrence/value_at/{gage_id}",
-        "slider_t0": slider_t0,
-        "slider_max": slider_max,
-        "valid_time_indices_json": json.dumps(valid_time_indices),
-        "valid_times_iso_json": json.dumps(valid_times_iso),
-        "west": meta["west"],
-        "south": meta["south"],
-        "east": meta["east"],
-        "north": meta["north"],
-        "recurrence_max_count": meta["recurrence_max_count"],
-        "n_valid_times": meta["n_valid_times"],
+        "state": state,
         "gage_id": gage_id,
     }
 
     return App.render(
         request,
-        "leaflet_mrms.html",
+        "station_qc.html",
         context,
     )

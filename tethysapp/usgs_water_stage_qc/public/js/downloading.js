@@ -27,7 +27,7 @@ async function downloadData() {
 
     try {
         const url = gageId
-        ? `/apps/usgs-water-stage-qc/do_download_zarr/${state}/${gageId}/`
+        ? `/apps/usgs-water-stage-qc/do_download_stage/${state}/${gageId}/`
         : `/apps/usgs-water-stage-qc/do_download_basin/${state}/`;
 
         const res = await fetch(url, { method: "POST", headers: { "X-CSRFToken": csrf } });
