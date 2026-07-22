@@ -150,6 +150,78 @@
         </div>
     {% endif %}
 
+    {% if selected_event %}
+        <div class="card mt-4" id="selected-event">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Selected Event</h4>
+                    <a
+                        href="#historical-events-table"
+                        class="btn btn-sm btn-outline-secondary"
+                    >
+                        Back to Events
+                    </a>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-2 mb-3">
+                        <strong>Rank</strong>
+                        <div>{{ selected_event.rank|default:"—" }}</div>
+                    </div>
+
+                    <div class="col-md-3 mb-3">
+                        <strong>Peak Date</strong>
+                        <div>{{ selected_event.date_peak }}</div>
+                    </div>
+
+                    <div class="col-md-2 mb-3">
+                        <strong>Peak Stage</strong>
+                        <div>
+                            {% if selected_event.peak_stage_ft != None %}
+                                {{ selected_event.peak_stage_ft }} ft
+                            {% else %}
+                                —
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-3 mb-3">
+                        <strong>Above Baseflow</strong>
+                        <div>
+                            {% if selected_event.stage_above_baseflow_ft != None %}
+                                {{ selected_event.stage_above_baseflow_ft }} ft
+                            {% else %}
+                                —
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-md-2 mb-3">
+                        <strong>Duration</strong>
+                        <div>
+                            {% if selected_event.duration_hours != None %}
+                                {{ selected_event.duration_hours }} hr
+                            {% else %}
+                                —
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% if selected_event_plot_error %}
+                    <div class="alert alert-warning mb-0" role="alert">
+                        <strong>Unable to display selected event</strong>
+                        <div>{{ selected_event_plot_error }}</div>
+                    </div>
+                {% elif selected_event_plot %}
+                    {% gizmo selected_event_plot %}
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+
     <div class="card mt-4">
         <div class="card-body">
 
@@ -234,14 +306,16 @@
                                     </td>
 
                                     <td>
-                                        <button
-                                            type="button"
-                                            class="btn btn-sm btn-outline-primary"
-                                            disabled
-                                            title="Event visualization will be added next."
-                                        >
-                                            View
-                                        </button>
+                                        {% if event.event_id != None %}
+                                            <a
+                                                href="?event_id={{ event.event_id }}#selected-event"
+                                                class="btn btn-sm btn-outline-primary"
+                                            >
+                                                View
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
                                     </td>
                                 </tr>
                             {% endfor %}
@@ -260,3 +334,4 @@
 </div>
 
 {% endblock %}
+

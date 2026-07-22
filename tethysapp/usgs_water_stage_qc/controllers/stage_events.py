@@ -148,7 +148,11 @@ def stage_events(request, state, gage_id, app_media):
             for _, event in events_for_display.iterrows():
                 historical_events.append(
                     {
-                        "event_id": int(event["event_id"]),
+                        "event_id": (
+                            int(event["event_id"])
+                            if pd.notna(event["event_id"])
+                            else None
+                        ),
                         "rank": (
                             int(event["selected_rank"])
                             if pd.notna(event["selected_rank"])
@@ -215,7 +219,39 @@ def stage_events(request, state, gage_id, app_media):
                     }
                 )
 
-        context["historical_events"] = historical_events
+        selected_event = None
+        selected_event_row = None
+        selected_event_id = request.GET.get("event_id")
+
+        if selected_event_id:
+            try:
+                selected_event_id = int(selected_event_id)
+
+                selected_event = next(
+                    (
+                        event
+                        for event in historical_events
+                        if event["event_id"] == selected_event_id
+                    ),
+                    None,
+                )
+
+                matching_events = events_for_display[
+                    events_for_display["event_id"] == selected_event_id
+                ]
+
+                if not matching_events.empty:
+                    selected_event_row = matching_events.iloc[0]
+
+            except (TypeError, ValueError):
+                selected_event = None
+
+        context.update(
+            {
+                "historical_events": historical_events,
+                "selected_event": selected_event,
+            }
+        )
 
         if observations.empty:
             first_observation = None
@@ -421,6 +457,158 @@ def stage_events(request, state, gage_id, app_media):
                     height="600px",
                     width="100%",
                 )
+
+                if selected_event_row is not None:
+                    event_start = selected_event_row["date_start"]
+                    event_peak = selected_event_row["date_peak"]
+                    event_end = selected_event_row["date_end"]
+
+                    if (
+                        pd.isna(event_start)
+                        or pd.isna(event_end)
+                        or event_end < event_start
+                    ):
+                        context["selected_event_plot_error"] = (
+                            "The selected event does not have a valid "
+                            "start and end datetime."
+                        )
+                    else:
+                        event_plot_data = stage_plot_data[
+                            stage_plot_data["datetime"].between(
+                                event_start,
+                                event_end,
+                                inclusive="both",
+                            )
+                        ].copy()
+
+                        if event_plot_data.empty:
+                            context["selected_event_plot_error"] = (
+                                "No processed stage observations are "
+                                "available within the selected event."
+                            )
+                        else:
+                            event_figure = go.Figure()
+
+                            event_figure.add_trace(
+                                go.Scatter(
+                                    x=event_plot_data["datetime"],
+                                    y=event_plot_data["Stage_ft"],
+                                    mode="lines",
+                                    name="Observed Stage",
+                                    line={"width": 2},
+                                    customdata=event_plot_data[
+                                        [
+                                            "baseflow_ft",
+                                            "stage_above_baseflow_ft",
+                                        ]
+                                    ],
+                                    connectgaps=False,
+                                    hovertemplate=(
+                                        "<b>Observed Stage</b><br>"
+                                        "Datetime: "
+                                        "%{x|%Y-%m-%d %H:%M}<br>"
+                                        "Stage: %{y:.2f} ft<br>"
+                                        "Baseflow: "
+                                        "%{customdata[0]:.2f} ft<br>"
+                                        "Stage above baseflow: "
+                                        "%{customdata[1]:.2f} ft"
+                                        "<extra></extra>"
+                                    ),
+                                )
+                            )
+
+                            event_baseflow_data = event_plot_data.dropna(
+                                subset=["baseflow_ft"]
+                            )
+
+                            if not event_baseflow_data.empty:
+                                event_figure.add_trace(
+                                    go.Scatter(
+                                        x=event_baseflow_data["datetime"],
+                                        y=event_baseflow_data[
+                                            "baseflow_ft"
+                                        ],
+                                        mode="lines",
+                                        name="Baseflow",
+                                        line={
+                                            "width": 1.5,
+                                            "dash": "dash",
+                                        },
+                                        connectgaps=False,
+                                        hovertemplate=(
+                                            "<b>Baseflow</b><br>"
+                                            "Datetime: "
+                                            "%{x|%Y-%m-%d %H:%M}<br>"
+                                            "Baseflow: %{y:.2f} ft"
+                                            "<extra></extra>"
+                                        ),
+                                    )
+                                )
+
+                            peak_stage = selected_event_row["flow_peak"]
+
+                            if (
+                                pd.notna(event_peak)
+                                and pd.notna(peak_stage)
+                            ):
+                                event_figure.add_trace(
+                                    go.Scatter(
+                                        x=[event_peak],
+                                        y=[peak_stage],
+                                        mode="markers",
+                                        name="Event Peak",
+                                        marker={
+                                            "size": 11,
+                                            "symbol": "diamond",
+                                        },
+                                        hovertemplate=(
+                                            "<b>Event Peak</b><br>"
+                                            "Datetime: "
+                                            "%{x|%Y-%m-%d %H:%M}<br>"
+                                            "Stage: %{y:.2f} ft"
+                                            "<extra></extra>"
+                                        ),
+                                    )
+                                )
+
+                            event_figure.update_layout(
+                                title={
+                                    "text": (
+                                        "Selected Water-Stage Event"
+                                    ),
+                                    "x": 0.5,
+                                },
+                                xaxis={
+                                    "title": "Datetime (UTC)",
+                                    "showgrid": True,
+                                },
+                                yaxis={
+                                    "title": "Stage (ft)",
+                                    "showgrid": True,
+                                },
+                                hovermode="x unified",
+                                template="plotly_white",
+                                height=500,
+                                margin={
+                                    "l": 70,
+                                    "r": 30,
+                                    "t": 70,
+                                    "b": 70,
+                                },
+                                legend={
+                                    "orientation": "h",
+                                    "yanchor": "bottom",
+                                    "y": 1.02,
+                                    "xanchor": "right",
+                                    "x": 1,
+                                },
+                            )
+
+                            context["selected_event_plot"] = PlotlyView(
+                                event_figure,
+                                height="500px",
+                                width="100%",
+                            )
 
     except Exception as exc:
         context["data_error"] = str(exc)
