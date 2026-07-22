@@ -150,6 +150,113 @@
         </div>
     {% endif %}
 
+    <div class="card mt-4">
+        <div class="card-body">
+
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="card-title mb-1">
+                        Historical Events
+                    </h4>
+
+                    <p class="text-muted mb-0">
+                        Highest-ranked water-stage events selected for this
+                        station. Datetimes are shown in UTC.
+                    </p>
+                </div>
+
+                {% if historical_events %}
+                    <span class="badge badge-primary">
+                        {{ historical_events|length }} events
+                    </span>
+                {% endif %}
+            </div>
+
+            {% if events_error %}
+                <div class="alert alert-warning mt-4" role="alert">
+                    <strong>Unable to display historical events</strong>
+                    <div>{{ events_error }}</div>
+                </div>
+            {% endif %}
+
+            {% if historical_events %}
+                <div class="table-responsive mt-4">
+                    <table
+                        class="table table-hover table-striped"
+                        id="historical-events-table"
+                    >
+                        <thead>
+                            <tr>
+                                <th scope="col">Rank</th>
+                                <th scope="col">Peak Date</th>
+                                <th scope="col">Peak Stage</th>
+                                <th scope="col">Above Baseflow</th>
+                                <th scope="col">Duration</th>
+                                <th scope="col">Event</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for event in historical_events %}
+                                <tr>
+                                    <td>
+                                        <strong>
+                                            {{ event.rank|default:"—" }}
+                                        </strong>
+                                    </td>
+
+                                    <td>
+                                        {{ event.date_peak }}
+                                    </td>
+
+                                    <td>
+                                        {% if event.peak_stage_ft != None %}
+                                            {{ event.peak_stage_ft }} ft
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        {% if event.stage_above_baseflow_ft != None %}
+                                            {{ event.stage_above_baseflow_ft }} ft
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        {% if event.duration_hours != None %}
+                                            {{ event.duration_hours }} hr
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-primary"
+                                            disabled
+                                            title="Event visualization will be added next."
+                                        >
+                                            View
+                                        </button>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <p class="text-muted small mb-0">
+                    Duration is calculated from the detected event start
+                    to the detected event end.
+                </p>
+            {% endif %}
+
+        </div>
+    </div>
 </div>
 
 {% endblock %}

@@ -89,6 +89,134 @@ def stage_events(request, state, gage_id, app_media):
         excluded_observations = pd.read_parquet(excluded_path)
         selected_events = pd.read_parquet(selected_events_path)
 
+        historical_events = []
+
+        required_event_columns = {
+            "event_id",
+            "selected_rank",
+            "date_start",
+            "date_peak",
+            "date_end",
+            "flow_peak",
+            "baseflow_peak",
+            "peak_quick_stage_ft",
+            "combined_normalized_score",
+        }
+
+        missing_event_columns = sorted(
+            required_event_columns - set(selected_events.columns)
+        )
+
+        if selected_events.empty:
+            context["events_error"] = (
+                "No selected historical events are available for this station."
+            )
+
+        elif missing_event_columns:
+            context["events_error"] = (
+                "The selected-events dataset is missing the following "
+                "required columns: "
+                + ", ".join(missing_event_columns)
+            )
+
+        else:
+            events_for_display = selected_events.copy()
+
+            events_for_display["date_start"] = pd.to_datetime(
+                events_for_display["date_start"],
+                errors="coerce",
+            )
+            events_for_display["date_peak"] = pd.to_datetime(
+                events_for_display["date_peak"],
+                errors="coerce",
+            )
+            events_for_display["date_end"] = pd.to_datetime(
+                events_for_display["date_end"],
+                errors="coerce",
+            )
+
+            events_for_display["duration_hours"] = (
+                events_for_display["date_end"]
+                - events_for_display["date_start"]
+            ).dt.total_seconds() / 3600
+
+            events_for_display = events_for_display.sort_values(
+                by=["selected_rank", "date_peak"],
+                na_position="last",
+            )
+
+            for _, event in events_for_display.iterrows():
+                historical_events.append(
+                    {
+                        "event_id": int(event["event_id"]),
+                        "rank": (
+                            int(event["selected_rank"])
+                            if pd.notna(event["selected_rank"])
+                            else None
+                        ),
+                        "date_start": (
+                            event["date_start"].strftime(
+                                "%Y-%m-%d %H:%M"
+                            )
+                            if pd.notna(event["date_start"])
+                            else "Not available"
+                        ),
+                        "date_peak": (
+                            event["date_peak"].strftime(
+                                "%Y-%m-%d %H:%M"
+                            )
+                            if pd.notna(event["date_peak"])
+                            else "Not available"
+                        ),
+                        "date_end": (
+                            event["date_end"].strftime(
+                                "%Y-%m-%d %H:%M"
+                            )
+                            if pd.notna(event["date_end"])
+                            else "Not available"
+                        ),
+                        "peak_stage_ft": (
+                            round(float(event["flow_peak"]), 2)
+                            if pd.notna(event["flow_peak"])
+                            else None
+                        ),
+                        "baseflow_at_peak_ft": (
+                            round(float(event["baseflow_peak"]), 2)
+                            if pd.notna(event["baseflow_peak"])
+                            else None
+                        ),
+                        "stage_above_baseflow_ft": (
+                            round(
+                                float(event["peak_quick_stage_ft"]),
+                                2,
+                            )
+                            if pd.notna(event["peak_quick_stage_ft"])
+                            else None
+                        ),
+                        "duration_hours": (
+                            round(float(event["duration_hours"]), 2)
+                            if pd.notna(event["duration_hours"])
+                            else None
+                        ),
+                        "combined_score": (
+                            round(
+                                float(
+                                    event[
+                                        "combined_normalized_score"
+                                    ]
+                                ),
+                                4,
+                            )
+                            if pd.notna(
+                                event["combined_normalized_score"]
+                            )
+                            else None
+                        ),
+                    }
+                )
+
+        context["historical_events"] = historical_events
+
         if observations.empty:
             first_observation = None
             last_observation = None
