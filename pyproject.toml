@@ -4,20 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tethysapp-usgs_water_stage_qc"
-description =  "Tethys application for real-time flood early warning, MRMS rainfall visualization, USGS water stage monitoring, and hydrologic alert analysis across the United States."
+description =  "Tethys application for USGS water stage quality control across the United States."
 
 readme = "README.md"
 
 license = { text = "Apache-2.0" }
 
 authors = [
-    { name = "Gonzalo Forero" },
-    { name = "Jacob Jhonson" }
+    { name = "Gonzalo Forero" }
 ]
 
-keywords = ["flood",
-    "flood forecasting",
-    "early warning system",
+keywords = [
     "hydrology",
     "MRMS",
     "USGS",
@@ -26,8 +23,6 @@ keywords = ["flood",
     "hydrologic modeling",
     "geospatial",
     "Tethys Platform",
-    "flash floods",
-    "radar rainfall",
     "hydroinformatics",
     "real-time monitoring"]
 
