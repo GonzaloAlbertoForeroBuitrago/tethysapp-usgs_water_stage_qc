@@ -16,17 +16,9 @@
     {% if data_error %}
         <div class="alert alert-danger" role="alert">
             <strong>Unable to load stage data</strong>
-
-            <div>
-                {{ data_error }}
-            </div>
-
+            <div>{{ data_error }}</div>
             <hr>
-
-            <div>
-                Downloaded-data directory:
-            </div>
-
+            <div>Downloaded-data directory:</div>
             <code>{{ data_directory }}</code>
         </div>
     {% endif %}
@@ -34,7 +26,6 @@
     {% if data_summary %}
         <div class="card">
             <div class="card-body">
-
                 <h4 class="card-title">
                     {{ data_summary.station_name|default:"USGS Station" }}
                 </h4>
@@ -45,44 +36,34 @@
                             <th>State</th>
                             <td>{{ state }}</td>
                         </tr>
-
                         <tr>
                             <th>USGS Gage ID</th>
                             <td>{{ gage_id }}</td>
                         </tr>
-
                         <tr>
                             <th>Observations</th>
                             <td>{{ data_summary.observation_rows }}</td>
                         </tr>
-
                         <tr>
                             <th>HydroEventDetector rows</th>
-                            <td>
-                                {{ data_summary.hydroeventdetector_rows }}
-                            </td>
+                            <td>{{ data_summary.hydroeventdetector_rows }}</td>
                         </tr>
-                        
                         <tr>
-                            <th>Selected Events</th>
+                            <th>Selected events</th>
                             <td>{{ data_summary.selected_events }}</td>
                         </tr>
-
                         <tr>
                             <th>Excluded observations</th>
                             <td>{{ data_summary.excluded_rows }}</td>
                         </tr>
-
                         <tr>
                             <th>First observation</th>
                             <td>{{ data_summary.first_observation }}</td>
                         </tr>
-
                         <tr>
                             <th>Last observation</th>
                             <td>{{ data_summary.last_observation }}</td>
                         </tr>
-
                         <tr>
                             <th>Minimum stage</th>
                             <td>
@@ -90,7 +71,6 @@
                                 {{ data_summary.unit }}
                             </td>
                         </tr>
-
                         <tr>
                             <th>Maximum stage</th>
                             <td>
@@ -98,26 +78,20 @@
                                 {{ data_summary.unit }}
                             </td>
                         </tr>
-
                         <tr>
                             <th>Latitude</th>
                             <td>{{ data_summary.latitude }}</td>
                         </tr>
-
                         <tr>
                             <th>Longitude</th>
                             <td>{{ data_summary.longitude }}</td>
                         </tr>
-
                         <tr>
                             <th>Data directory</th>
-                            <td>
-                                <code>{{ data_directory }}</code>
-                            </td>
+                            <td><code>{{ data_directory }}</code></td>
                         </tr>
                     </tbody>
                 </table>
-
             </div>
         </div>
     {% endif %}
@@ -125,27 +99,19 @@
     {% if plot_error %}
         <div class="alert alert-warning mt-4" role="alert">
             <strong>Unable to create stage plot</strong>
-
-            <div>
-                {{ plot_error }}
-            </div>
+            <div>{{ plot_error }}</div>
         </div>
     {% endif %}
 
     {% if stage_plot %}
         <div class="card mt-4">
             <div class="card-body">
-
-                <h4 class="card-title">
-                    Water Stage Time Series
-                </h4>
-
+                <h4 class="card-title">Water Stage Time Series</h4>
                 <p class="text-muted">
-                    Observed USGS water stage and the baseflow estimated by HydroEventDetector. Datetimes are shown in UTC.
+                    Observed USGS water stage and the baseflow estimated by
+                    HydroEventDetector. Datetimes are shown in UTC.
                 </p>
-
                 {% gizmo stage_plot %}
-
             </div>
         </div>
     {% endif %}
@@ -167,7 +133,7 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-2 mb-3">
-                        <strong>Rank</strong>
+                        <strong>{{ ranking_label }} Rank</strong>
                         <div>{{ selected_event.rank|default:"—" }}</div>
                     </div>
 
@@ -225,17 +191,64 @@
     <div class="card mt-4">
         <div class="card-body">
 
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h4 class="card-title mb-1">
-                        Historical Events
-                    </h4>
-
+            <div class="row align-items-end">
+                <div class="col-lg-7">
+                    <h4 class="card-title mb-1">Historical Events</h4>
                     <p class="text-muted mb-0">
-                        Highest-ranked water-stage events selected for this
-                        station. Datetimes are shown in UTC.
+                        Explore the selected water-stage events using the
+                        ranking method most relevant to your analysis.
+                        Datetimes are shown in UTC.
                     </p>
                 </div>
+
+                <div class="col-lg-5 mt-3 mt-lg-0">
+                    <form method="get" action="#historical-events-table">
+                        <label
+                            for="ranking-method"
+                            class="font-weight-bold mb-1"
+                        >
+                            Rank events by
+                        </label>
+
+                        <select
+                            id="ranking-method"
+                            name="ranking_method"
+                            class="form-control"
+                            onchange="this.form.submit()"
+                        >
+                            {% for option in ranking_options %}
+                                <option
+                                    value="{{ option.value }}"
+                                    {% if option.value == ranking_method %}
+                                        selected
+                                    {% endif %}
+                                >
+                                    {{ option.label }}
+                                </option>
+                            {% endfor %}
+                        </select>
+
+                        <small class="form-text text-muted">
+                            {{ ranking_description }}
+                        </small>
+
+                        <noscript>
+                            <button
+                                type="submit"
+                                class="btn btn-primary btn-sm mt-2"
+                            >
+                                Apply ranking
+                            </button>
+                        </noscript>
+                    </form>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <span class="text-muted small">
+                    Active ranking:
+                    <strong>{{ ranking_label }}</strong>
+                </span>
 
                 {% if historical_events %}
                     <span class="badge badge-primary">
@@ -276,11 +289,7 @@
                                             {{ event.rank|default:"—" }}
                                         </strong>
                                     </td>
-
-                                    <td>
-                                        {{ event.date_peak }}
-                                    </td>
-
+                                    <td>{{ event.date_peak }}</td>
                                     <td>
                                         {% if event.peak_stage_ft != None %}
                                             {{ event.peak_stage_ft }} ft
@@ -288,7 +297,6 @@
                                             —
                                         {% endif %}
                                     </td>
-
                                     <td>
                                         {% if event.stage_above_baseflow_ft != None %}
                                             {{ event.stage_above_baseflow_ft }} ft
@@ -296,7 +304,6 @@
                                             —
                                         {% endif %}
                                     </td>
-
                                     <td>
                                         {% if event.duration_hours != None %}
                                             {{ event.duration_hours }} hr
@@ -304,11 +311,10 @@
                                             —
                                         {% endif %}
                                     </td>
-
                                     <td>
                                         {% if event.event_id != None %}
                                             <a
-                                                href="?event_id={{ event.event_id }}#selected-event"
+                                                href="?ranking_method={{ ranking_method }}&event_id={{ event.event_id }}#selected-event"
                                                 class="btn btn-sm btn-outline-primary"
                                             >
                                                 View
@@ -324,8 +330,8 @@
                 </div>
 
                 <p class="text-muted small mb-0">
-                    Duration is calculated from the detected event start
-                    to the detected event end.
+                    Changing the ranking only reorders the existing events.
+                    Event identity and processed data remain unchanged.
                 </p>
             {% endif %}
 
